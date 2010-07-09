@@ -7,6 +7,7 @@ class RemoteJetpayTest < Test::Unit::TestCase
     
     @credit_card = credit_card('4000300020001000')
     @declined_card = credit_card('4000300020001000')
+    @card_for_void = credit_card('4555555555555519')
     
     @options = {
       :order_id => '1',
@@ -46,7 +47,7 @@ class RemoteJetpayTest < Test::Unit::TestCase
   
   def test_void
     # must void a valid auth
-    assert auth = @gateway.authorize(9900, @credit_card, @options)
+    assert auth = @gateway.authorize(1000, @card_for_void, @options)
     assert_success auth
     assert_equal 'APPROVED', auth.message
     assert_not_nil auth.authorization
@@ -92,12 +93,25 @@ class RemoteJetpayTest < Test::Unit::TestCase
   end
 
   def test_invalid_login
-    gateway = JetpayGateway.new(:login => '')
+    gateway = JetpayGateway.new(:login => 'bogus_login')
     assert response = gateway.purchase(9900, @credit_card, @options)
     assert_failure response
     
     assert_equal 'Terminal ID Not Found.', response.message
   end
   
+  # def test_blank_login
+  #   gateway = JetpayGateway.new(:login => '')
+  #   assert response = gateway.purchase(9900, @credit_card, @options)
+  #   assert_failure response
+  #   
+  #   assert_equal 'Terminal ID Not Found.', response.message
+  # end
   
+  def test_store
+    assert response = @gateway.store(@credit_card, @options)
+    assert_success response
+    assert_equal "TOKENIZED", response.message
+    assert_not_nil response.params['token']
+  end
 end

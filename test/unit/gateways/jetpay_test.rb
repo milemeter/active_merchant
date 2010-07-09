@@ -32,7 +32,7 @@ class JetpayTest < Test::Unit::TestCase
     assert_equal('TEST47', response.params["approval"])
     assert response.test?
   end
-
+  
   def test_unsuccessful_request
     @gateway.expects(:ssl_post).returns(failed_purchase_response)
     
@@ -113,11 +113,19 @@ class JetpayTest < Test::Unit::TestCase
     assert_equal 'P', response.cvv_result['code']
   end
   
+  def test_successful_store
+    @gateway.expects(:ssl_post).returns(successful_store_response)
+    
+    response = @gateway.store(@credit_card)
+    assert_success response
+    assert_equal 'KKHKOIIBJBJBKNKMNBJJJKJK', response.params['token']
+  end
   
   private
   def successful_purchase_response
     <<-EOF
-    <JetPayResponse><TransactionID>707a4f1750d8dc03bd</TransactionID>
+    <JetPayResponse>
+      <TransactionID>707a4f1750d8dc03bd</TransactionID>
       <ActionCode>000</ActionCode>
       <Approval>TEST47</Approval>
       <CVV2>P</CVV2>
@@ -180,6 +188,18 @@ class JetpayTest < Test::Unit::TestCase
         <Approval>002F6B</Approval>
         <ResponseText>APPROVED</ResponseText>
       </JetPayResponse>
+    EOF
+  end
+  
+  def successful_store_response
+    <<-EOF
+    <JetPayResponse>
+      <TransactionID>TOKENTEST000000002</TransactionID>
+      <ActionCode>000</ActionCode>
+      <Approval>TOKEN0</Approval>
+      <ResponseText>TOKENIZED</ResponseText>
+      <Token>KKHKOIIBJBJBKNKMNBJJJKJK</Token>
+    </JetPayResponse>
     EOF
   end
 end

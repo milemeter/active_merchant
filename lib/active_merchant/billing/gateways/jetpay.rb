@@ -23,41 +23,42 @@ module ActiveMerchant #:nodoc:
         "001" =>  "Refer to card issuer.",
         "002" =>  "Refer to card issuer, special condition.",
         "003" =>  "Pick up card.",
-        "200" =>  "Deny - Pick up card.",
         "005" =>  "Do not honor.",
-        "100" =>  "Deny.",
         "006" =>  "Error.",
-        "181" =>  "Format error.",
         "007" =>  "Pickup card, special condition.",
-        "104" =>  "Deny - New card issued.",
-        "110" =>  "Invalid amount.",
         "014" =>  "Invalid account number (no such number).",
-        "111" =>  "Invalid account.",
         "015" =>  "No such issuer.",
-        "103" =>  "Deny - Invalid manual Entry 4DBC.",
-        "182" =>  "Please wait.",
-        "109" =>  "Invalid merchant.",
+        "025" =>  "Transaction Not Found.",
         "041" =>  "Pick up card (lost card).",
         "043" =>  "Pick up card (stolen card).",
         "051" =>  "Insufficient funds.",
         "052" =>  "No checking account.",
-        "105" =>  "Deny - Account Cancelled.",
         "054" =>  "Expired Card.",
-        "101" =>  "Expired Card.",
-        "183" =>  "Invalid currency code.",
         "057" =>  "Transaction not permitted to cardholder.",
-        "115" =>  "Service not permitted.",
         "062" =>  "Restricted card.",
-        "189" =>  "Deny - Cancelled or Closed Merchant/SE.",
-        "188" =>  "Deny - Expiration date required.",
-        "125" =>  "Invalid effective date.",
-        "122" =>  "Invalid card (CID) security code.",
-        "400" =>  "Reversal accepted.",
-        "992" =>  "DECLINE/TIMEOUT.",
+        "100" =>  "Deny.",
+        "101" =>  "Expired Card.",
+        "103" =>  "Deny - Invalid manual Entry 4DBC.",
+        "104" =>  "Deny - New card issued.",
+        "105" =>  "Deny - Account Cancelled.",
         "107" =>  "Please Call Issuer.",
-        "025" =>  "Transaction Not Found.",
-        "981" =>  "AVS Error.",
+        "109" =>  "Invalid merchant.",
+        "110" =>  "Invalid amount.",
+        "111" =>  "Invalid account.",
+        "115" =>  "Service not permitted.",
+        "122" =>  "Invalid card (CID) security code.",
+        "125" =>  "Invalid effective date.",
+        "181" =>  "Format error.",
+        "182" =>  "Please wait.",
+        "183" =>  "Invalid currency code.",
+        "188" =>  "Deny - Expiration date required.",
+        "189" =>  "Deny - Cancelled or Closed Merchant/SE.",
+        "200" =>  "Deny - Pick up card.",
+        "400" =>  "Reversal accepted.",
+        "912" =>  "Token not present.",
         "913" =>  "Invalid Card Type.",
+        "981" =>  "AVS Error.",
+        "992" =>  "DECLINE/TIMEOUT.",
         "996" =>  "Terminal ID Not Found."
       }
       
@@ -97,6 +98,10 @@ module ActiveMerchant #:nodoc:
         commit(money, build_credit_request('CREDIT', money, transaction_id, credit_card))
       end
       
+      def store(credit_card, options = {})
+        commit(0, build_tokenize_request(credit_card, options))        
+      end
+      
       private
       
       def build_xml_request(transaction_type, transaction_id = nil, &block)
@@ -106,7 +111,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'TerminalID', @options[:login]
           xml.tag! 'TransactionType', transaction_type
           xml.tag! 'TransactionID', transaction_id.nil? ? generate_unique_id.slice(0, 18) : transaction_id
-          
+                  
           if block_given?
             yield xml
           else 
@@ -162,12 +167,19 @@ module ActiveMerchant #:nodoc:
         end
       end
       
+      def build_tokenize_request(credit_card, options)
+        build_xml_request('TOKENIZE') do |xml|
+          add_credit_card(xml, credit_card)
+          
+          xml.target!
+        end
+      end
+      
       def commit(money, request)
         response = parse(ssl_post(test? ? TEST_URL : LIVE_URL, request))
-        
         success = success?(response)
         Response.new(success, 
-          success ? 'APPROVED' : message_from(response), 
+          success ? response[:response_text] : message_from(response), 
           response, 
           :test => test?, 
           :authorization => authorization_from(response, money),
@@ -224,7 +236,7 @@ module ActiveMerchant #:nodoc:
           xml.tag! 'CVV2', credit_card.verification_value
         end
       end
-      
+            
       def add_addresses(xml, options)
         if billing_address = options[:billing_address] || options[:address]
           xml.tag! 'BillingAddress', [billing_address[:address1], billing_address[:address2]].compact.join(" ")
